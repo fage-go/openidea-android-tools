@@ -16,6 +16,8 @@ const DISCOVERY: &str = concat!(
 pub const LAUNCH: &str = concat!(
     include_str!("gradle-env.sh"),
     "\n",
+    include_str!("android-cli.sh"),
+    "\n",
     include_str!("launch.sh")
 );
 

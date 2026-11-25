@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Android Tools</title>
+  <link rel="stylesheet" href="panel.css">
+  <link rel="stylesheet" href="emulators.css">
+  <script src="panel.js" defer></script>
+  <script src="emulators.js" defer></script>
+</head>
+<body>
+<main id="android-panel">
+  <header class="panel-heading">
+    <div class="panel-title">
+      <img src="android.svg" width="16" height="16" alt="">
+      <h1>Android Tools</h1>
+    </div>
+    <details id="panel-settings">
+      <summary title="设置" aria-label="设置"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.7 4.1l.7-1.1h3.2l.7 1.1.5 2 1.1.7 2-.6 1.3.1 1.6 2.8-.6 1.2-1.5 1.4v1.3l1.5 1.4.6 1.2-1.6 2.8-1.3.1-2-.6-1.1.7-.5 2-.7 1.1h-3.2l-.7-1.1-.5-2-1.1-.7-2 .6-1.3-.1-1.6-2.8.6-1.2 1.5-1.4v-1.3l-1.5-1.4-.6-1.2 1.6-2.8 1.3-.1 2 .6 1.1-.7.5-2Z"/><circle cx="12" cy="12" r="3"/></svg></summary>
+      <div class="settings-menu">
+        <button type="button" data-action="configure-android-environment" disabled>配置Android环境</button>
+      </div>
+    </details>
+  </header>
+  <div id="android-tools-content">
+    <section aria-labelledby="settings-title">
+      <div class="section-header">
+        <h2 id="settings-title"><button type="button" class="section-toggle" aria-expanded="true" aria-controls="settings-content">设备配置</button></h2>
+        <button type="button" class="primary" data-action="refresh-config" disabled>应用</button>
+      </div>
+      <div id="settings-content"></div>
+    </section>
+  </div>
+  <dialog id="android-environment" aria-labelledby="android-environment-title"></dialog>
+  <p id="android-no-project" hidden>打开 Android Gradle 项目</p>
+</main>
+<dialog id="adb-result" aria-labelledby="adb-result-title">
+  <header class="result-header">
+    <h2 id="adb-result-title">ADB 执行结果</h2>
+    <div class="result-actions">
+      <button type="button" class="icon-button" id="adb-copy" aria-label="复制结果" title="复制结果" disabled><svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="8" rx="1.2" stroke="currentColor" stroke-width="1.3"/><path d="M10.5 3.5V3a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+      <button type="button" class="icon-button close" data-close aria-label="关闭" title="关闭" autofocus>×</button>
+    </div>
+  </header>
+  <div class="result-meta">
+    <code id="adb-result-command"></code>
+    <span id="adb-result-device"></span>
+    <span id="adb-result-status" role="status"></span>
+  </div>
+  <pre id="adb-result-output" tabindex="0" aria-label="命令输出"></pre>
+  <p id="adb-copy-status" role="status"></p>
+</dialog>
+<dialog id="emulator-create" aria-labelledby="emulator-create-title">
+  <header class="result-header">
+    <h2 id="emulator-create-title">新建模拟器</h2>
+    <button type="button" class="icon-button close" data-emulator-close aria-label="关闭">×</button>
+  </header>
+  <div class="emulator-fields">
+    <div data-emulator-step="0">
+      <h3>选择硬件</h3>
+      <label for="emulator-form">设备类型</label>
+      <select id="emulator-form"></select>
+      <label for="emulator-profile">硬件配置</label>
+      <select id="emulator-profile"></select>
+    </div>
+    <div data-emulator-step="1" hidden>
+      <h3>选择系统镜像</h3>
+      <label for="emulator-api">Android 版本</label>
+      <select id="emulator-api"></select>
+      <label for="emulator-image">系统镜像</label>
+      <select id="emulator-image"></select>
+      <p id="emulator-catalog-warning" hidden></p>
+    </div>
+    <div data-emulator-step="2" hidden>
+      <h3>确认配置</h3>
+      <label for="emulator-name">名称</label>
+      <input id="emulator-name" maxlength="80" pattern="[A-Za-z0-9][A-Za-z0-9._-]*" autocomplete="off">
+      <label for="emulator-orientation">启动方向</label>
+      <select id="emulator-orientation">
+        <option value="default">设备默认</option>
+        <option value="portrait">竖屏</option>
+        <option value="landscape">横屏</option>
+      </select>
+      <p id="emulator-summary"></p>
+      <label class="emulator-checkbox"><input id="emulator-boot" type="checkbox">创建后启动</label>
+      <div id="emulator-progress" hidden>
+        <p id="emulator-progress-status" role="status"></p>
+        <progress id="emulator-progress-bar" max="100" aria-label="模拟器下载和创建进度"></progress>
+      </div>
+    </div>
+    <p id="emulator-create-error" role="alert" hidden></p>
+  </div>
+  <footer class="emulator-footer">
+    <button type="button" id="emulator-back" hidden>上一步</button>
+    <button type="button" data-emulator-close>取消</button>
+    <button type="button" id="emulator-next" class="primary" disabled>下一步</button>
+  </footer>
+</dialog>
+<dialog id="emulator-delete" aria-labelledby="emulator-delete-title" aria-describedby="emulator-delete-target">
+  <header class="result-header">
+    <h2 id="emulator-delete-title">删除模拟器</h2>
+    <button type="button" class="icon-button close" data-emulator-delete-cancel aria-label="关闭">×</button>
+  </header>
+  <div class="emulator-fields">
+    <p id="emulator-delete-target">将删除 <strong id="emulator-delete-name"></strong> 及其数据。</p>
+    <label class="emulator-checkbox">
+      <input id="emulator-delete-image" type="checkbox" aria-describedby="emulator-delete-image-path emulator-delete-hint">
+      同时删除 System Image
+    </label>
+    <code id="emulator-delete-image-path" hidden></code>
+    <p id="emulator-delete-hint" role="status" hidden></p>
+    <p id="emulator-delete-error" role="alert" hidden></p>
+  </div>
+  <footer class="emulator-footer">
+    <button type="button" data-emulator-delete-cancel autofocus>取消</button>
+    <button type="button" id="emulator-delete-confirm" disabled>删除</button>
+  </footer>
+</dialog>
+<template id="emulator-trash-icon">
+  <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true"><path d="M2.8 4.6h10.4M6 4.6V2.8h4v1.8M4.2 4.6l.5 8.3h6.6l.5-8.3M6.8 6.8v3.9m2.4-3.9v3.9" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+</template>
+</body>
+</html>

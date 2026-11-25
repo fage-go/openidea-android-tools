@@ -4,12 +4,23 @@ use openidea_plugin::views::{Body, View, ViewEvent, Viewport, Views};
 use openidea_plugin::{Error, Invocation, NotificationLevel, PickItem, Plugin, register_plugin};
 use std::collections::BTreeMap;
 
+mod adb;
+mod emulator;
 mod gradle;
+mod history;
+mod layout;
 mod panel;
+mod setup;
 
 const VIEW: &str = "android";
 const SETTINGS: &str = ".gradle/openidea-android-tools.conf";
 const RUN_INDEX: &str = ".openidea/index-android-tools.json";
+
+fn view_request(payload: &str) -> Option<(&str, &str)> {
+    let (id, text) = payload.split_once('\n')?;
+    (!id.is_empty() && id.len() <= 60 && id.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-'))
+        .then_some((id, text))
+}
 
 fn configuration_id(module: &str) -> String {
     if module.len() > 28 {
@@ -36,9 +47,11 @@ struct AndroidTools {
 struct Panel {
     devices: Vec<Device>,
     device_error: Option<String>,
+    emulators: emulator::Manager,
     status: Option<String>,
 }
 
+#[derive(PartialEq, Eq)]
 struct Device {
     serial: String,
     state: String,
@@ -282,28 +295,153 @@ impl RunConfigurations for AndroidTools {
 }
 
 impl Views for AndroidTools {
-    fn render(&mut self, _: &str, _: Option<Viewport>, ctx: &Invocation) -> Result<View, Error> {
-        let Some(project) = ctx.project().filter(gradle::is_project) else {
-            return Ok(View::message("打开 Android Gradle 项目"));
-        };
-        Ok(View::new(Body::Html(panel::document(&configuration_id(
-            &project.root()?,
-        )))))
+    fn render(&mut self, view: &str, _: Option<Viewport>, _: &Invocation) -> Result<View, Error> {
+        if view == layout::VIEW {
+            return Ok(View::new(Body::Html(layout::document())));
+        }
+        Ok(View::message("打开 Android Gradle 项目"))
     }
 
-    fn handle(&mut self, _: &str, event: ViewEvent, ctx: &Invocation) -> Result<(), Error> {
+    fn handle(&mut self, view: &str, event: ViewEvent, ctx: &Invocation) -> Result<(), Error> {
         let ViewEvent::Message(message) = event else {
             return Ok(());
         };
-        let project = ctx.project().ok_or("请打开 Android Gradle 项目")?;
-        let root = project.root()?;
+        if view == layout::VIEW {
+            if let Some(request) = message.strip_prefix("read-snapshot\n") {
+                return layout::send_snapshot(ctx, request);
+            }
+            return Ok(());
+        }
+        if view != VIEW {
+            return Ok(());
+        }
+        let project = ctx.project();
+        let root = project.as_ref().map(Project::root).transpose()?;
+        let scope = root
+            .as_deref()
+            .map(configuration_id)
+            .unwrap_or_else(|| "no-project".into());
+        if message == "open-cli-download" {
+            let error = host::open_url(setup::DOWNLOAD)
+                .err()
+                .map(|error| error.to_string())
+                .unwrap_or_default();
+            return host::post_view_message(VIEW, &format!("{scope}\nsetup-link\n{error}"));
+        }
+        if let Some(platform) = message.strip_prefix("copy-install-command\n") {
+            let error = setup::install_command(platform)
+                .and_then(|command| host::copy_to_clipboard(&command))
+                .err()
+                .map(|error| error.to_string())
+                .unwrap_or_default();
+            return host::post_view_message(VIEW, &format!("{scope}\nsetup-copy\n{error}"));
+        }
+        if let Some((
+            action @ ("open"
+            | "configure-android-environment"
+            | "check-android-environment"
+            | "enter-android-tools"),
+            request,
+        )) = message.split_once('\n')
+        {
+            let Some((id, _)) = view_request(request) else {
+                return Ok(());
+            };
+            let configuration = action == "configure-android-environment";
+            let gradle_project = project.as_ref().filter(|p| gradle::is_project(p));
+            if configuration || (action != "enter-android-tools" && gradle_project.is_some()) {
+                let environment = setup::probe(project.as_ref());
+                if configuration || !environment.as_ref().is_ok_and(|env| env.ready) {
+                    let mut html = setup::contents(environment, configuration);
+                    if !configuration
+                        && let (Some(project), Some(root)) = (gradle_project, root.as_ref())
+                    {
+                        let contents = self
+                            .projects
+                            .entry(root.clone())
+                            .or_default()
+                            .contents(project);
+                        html.push_str("<template data-tools-preview>");
+                        html.push_str(&contents);
+                        html.push_str("</template>");
+                    }
+                    return host::post_view_message(VIEW, &format!("{scope}\nsetup\n{id}\n{html}"));
+                }
+            }
+            let (Some(project), Some(root)) = (gradle_project, root.as_ref()) else {
+                return host::post_view_message(
+                    VIEW,
+                    &format!("{scope}\nunsupported-project\n{id}\n"),
+                );
+            };
+            let panel = self.projects.entry(root.clone()).or_default();
+            panel.refresh_devices(project);
+            if let Err(error) = panel.refresh_modules(project) {
+                panel.status = Some(error.to_string());
+            }
+            return panel.post_contents(root, project, &format!("tools-ready\n{id}"));
+        }
+        let project = project.ok_or("请打开 Android Gradle 项目")?;
+        let root = root.ok_or("请打开 Android Gradle 项目")?;
+        if let Some(request) = message.strip_prefix("emulator\n") {
+            let Some((id, command)) = view_request(request) else {
+                return Ok(());
+            };
+            let panel = self.projects.entry(root.clone()).or_default();
+            let payload = emulator::handle(panel, &project, &root, command)
+                .unwrap_or_else(emulator::error_json);
+            return host::post_view_message(VIEW, &format!("{scope}\nemulator\n{id}\n{payload}"));
+        }
+        if let Some(request) = message.strip_prefix("copy-adb-result\n") {
+            let Some((id, output)) = view_request(request) else {
+                return Ok(());
+            };
+            let error = adb::copy_result(output)
+                .err()
+                .map(|error| error.to_string())
+                .unwrap_or_default();
+            return host::post_view_message(
+                VIEW,
+                &format!("{}\nadb-copy\n{id}\n{error}", configuration_id(&root)),
+            );
+        }
         let panel = self.projects.entry(root.clone()).or_default();
         let result = match message.as_str() {
-            "open" | "refresh-config" => {
+            "refresh-config" => {
                 panel.refresh_devices(&project);
                 panel.refresh_modules(&project)
             }
             _ => match message.split_once('\n') {
+                Some(("inspect-layout", request)) => {
+                    let Some((id, _)) = view_request(request) else {
+                        return Ok(());
+                    };
+                    return panel.capture_layout(&root, &project, id);
+                }
+                Some((action @ ("open-layout" | "export-layout" | "delete-layout"), id)) => {
+                    panel.status = None;
+                    history::layout_action(&project, action, id)
+                }
+                Some(("delete-command", command)) => {
+                    panel.status = None;
+                    history::delete_command(&project, command)
+                }
+                Some(("run-adb", request)) => {
+                    let Some((id, command)) = view_request(request) else {
+                        return Ok(());
+                    };
+                    let serial = Settings::read(&project).device;
+                    let result = adb::execute(&project, &serial, command);
+                    let payload = adb::message(result);
+                    let header = format!("{}\nadb\n{id}\n", configuration_id(&root));
+                    if let Err(error) = host::post_view_message(VIEW, &format!("{header}{payload}"))
+                    {
+                        let failure = adb::message(Err(error));
+                        host::post_view_message(VIEW, &format!("{header}{failure}"))?;
+                    }
+                    panel.status = None;
+                    Ok(())
+                }
                 Some((field, value)) => panel.change(&project, field, value),
                 None => return Ok(()),
             },
@@ -317,11 +455,49 @@ impl Views for AndroidTools {
 }
 
 impl Panel {
+    fn capture_layout(&mut self, root: &str, project: &Project, id: &str) -> Result<(), Error> {
+        self.status = None;
+        let record =
+            match layout::capture(project, &Settings::read(project).device).and_then(|snapshot| {
+                let mut payload = String::new();
+                snapshot.write_json(&mut payload);
+                history::save_layout(project, &snapshot.activity, &payload)
+            }) {
+                Ok(record) => Some(record),
+                Err(error) => {
+                    self.status = Some(error.to_string());
+                    None
+                }
+            };
+        // Release the panel's pending capture before opening an editor can move focus.
+        let posted = self.post_contents(root, project, &format!("capture\n{id}"));
+        if let Some(record) = record
+            && let Err(error) = history::open_layout(&record)
+        {
+            self.status = Some(error.to_string());
+            self.publish(root, project);
+        }
+        posted
+    }
+
     fn publish(&self, root: &str, project: &Project) {
+        let _ = self.post_contents(root, project, "panel");
+    }
+
+    fn contents(&self, project: &Project) -> String {
         let settings = Settings::read(project);
         let modules = gradle::modules(project).unwrap_or_default();
-        let html = panel::contents(self, &settings, &modules);
-        let _ = host::post_view_message(VIEW, &format!("{}\n{html}", configuration_id(root)));
+        let layouts = history::layouts(project);
+        let commands = history::commands(project);
+        panel::contents(self, &settings, &modules, layouts, commands)
+    }
+
+    fn post_contents(&self, root: &str, project: &Project, update: &str) -> Result<(), Error> {
+        let html = self.contents(project);
+        host::post_view_message(
+            VIEW,
+            &format!("{}\n{update}\n{html}", configuration_id(root)),
+        )
     }
 
     fn save(&self, project: &Project, settings: &Settings) -> Result<(), Error> {
@@ -420,6 +596,112 @@ register_plugin!(AndroidTools, views, run_configurations);
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn environment_configuration_is_available_when_android_cli_is_ready_or_missing() {
+        use openidea_plugin::{ProcessOutput, mock::MockHost};
+        use std::{cell::Cell, rc::Rc};
+
+        let mock = MockHost::install().with_capabilities(&[
+            "project.read",
+            "project.write",
+            "process:sh",
+            "process:adb",
+            "clipboard",
+        ]);
+        let installed = Rc::new(Cell::new(true));
+        let host_installed = Rc::clone(&installed);
+        mock.on_process("sh", move |args, _| {
+            if args
+                .last()
+                .is_some_and(|name| name == "openidea-android-environment")
+            {
+                Ok(ProcessOutput {
+                    status: Some(0),
+                    stdout: if host_installed.get() {
+                        "ready\nDarwin\narm64\n"
+                    } else {
+                        "missing\nDarwin\narm64\n"
+                    }
+                    .into(),
+                    stderr: String::new(),
+                })
+            } else {
+                Err("Gradle unavailable in fixture".into())
+            }
+        });
+        mock.on_process("adb", |_, _| {
+            Ok(ProcessOutput {
+                status: Some(0),
+                stdout: "List of devices attached\n".into(),
+                stderr: String::new(),
+            })
+        });
+        let ctx = mock.invocation();
+        let send = |plugin: &mut AndroidTools, message: &str| {
+            plugin
+                .handle(VIEW, ViewEvent::Message(message.into()), &ctx)
+                .unwrap();
+        };
+        let last = || mock.view_messages().pop().unwrap().1;
+        let mut plugin = AndroidTools::default();
+        send(&mut plugin, "open\nunsupported\n");
+        assert!(last().contains("\nunsupported-project\nunsupported\n"));
+        mock.set_project_root(None);
+        send(&mut plugin, "configure-android-environment\nstandalone\n");
+        assert!(last().starts_with("no-project\nsetup\nstandalone\n"));
+        send(&mut plugin, "enter-android-tools\nstandalone-back\n");
+        assert!(last().starts_with("no-project\nunsupported-project\nstandalone-back\n"));
+        mock.set_project_root(Some("/project"));
+        mock.add_file("settings.gradle", "");
+        send(&mut plugin, "open\nfirst\n");
+        assert!(last().contains("\ntools-ready\nfirst\n"));
+        send(
+            &mut plugin,
+            "configure-android-environment\nconfiguration\n",
+        );
+        let page = last();
+        assert!(page.contains("\nsetup\nconfiguration\n"));
+        assert!(page.contains("配置Android环境"));
+        assert!(page.contains("Android 环境已就绪"));
+        assert!(page.contains("install.sh | bash\" selected>macOS · Apple 芯片"));
+        assert!(page.contains("data-action=\"close-environment\">关闭"));
+        assert!(!page.contains("<template data-tools-preview>"));
+        assert!(page.contains("data-action=\"configure-android-environment\">重新检测"));
+        send(&mut plugin, "enter-android-tools\nback\n");
+        assert!(last().contains("\ntools-ready\nback\n"));
+        installed.set(false);
+        send(
+            &mut plugin,
+            "configure-android-environment\nconfiguration-missing\n",
+        );
+        assert!(last().contains("\nsetup\nconfiguration-missing\n"));
+        assert!(last().contains("未检测到 Android 环境"));
+        send(&mut plugin, "open\nmissing\n");
+        let first_missing = last();
+        assert!(first_missing.contains("\nsetup\nmissing\n"));
+        assert!(first_missing.contains("未检测到 Android 环境"));
+        assert!(first_missing.contains("install.sh | bash\" selected>macOS · Apple 芯片"));
+        let (_, tools) = first_missing
+            .split_once("<template data-tools-preview>")
+            .unwrap();
+        assert!(tools.contains("设备配置"));
+        assert!(tools.contains("模拟器管理"));
+        assert!(tools.contains("布局检查"));
+        assert!(tools.contains("ADB 命令"));
+        send(&mut plugin, "open-cli-download");
+        assert_eq!(mock.opened_urls(), [setup::DOWNLOAD]);
+        send(&mut plugin, "copy-install-command\nwindows_x86_64");
+        assert_eq!(
+            mock.clipboard().unwrap(),
+            setup::install_command("windows_x86_64").unwrap()
+        );
+        send(&mut plugin, "enter-android-tools\nskip\n");
+        assert!(last().contains("\ntools-ready\nskip\n"));
+        installed.set(true);
+        send(&mut plugin, "check-android-environment\nrecheck\n");
+        assert!(last().contains("\ntools-ready\nrecheck\n"));
+    }
 
     #[test]
     fn launch_scripts_fit_openidea_run_configuration_argument_limits() {

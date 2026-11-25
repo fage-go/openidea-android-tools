@@ -1,0 +1,224 @@
+#emulator-list:has(.emulator-records), #emulator-list > p {
+  border: 1px solid var(--panel-divider);
+  border-radius: 7px;
+  background: var(--panel-row);
+}
+
+#emulator-list > p {
+  padding: 9px 10px;
+}
+
+.emulator-records {
+  max-height: 206px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.emulator-records li {
+  box-sizing: border-box;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 8px;
+}
+
+.emulator-records li + li {
+  border-top: 1px solid var(--panel-divider);
+}
+
+.emulator-record-label {
+  min-width: 0;
+}
+
+.emulator-record-label strong, .emulator-record-label p {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.emulator-record-label p {
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.emulator-record-label p::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-inline-end: 5px;
+  vertical-align: 1px;
+  border-radius: 50%;
+  background: var(--panel-quiet);
+}
+
+[data-state="running"] .emulator-record-label p::before {
+  background: var(--panel-green);
+}
+
+[data-state="starting"] .emulator-record-label p::before,
+[data-state="stopping"] .emulator-record-label p::before {
+  background: var(--openidea-warning, #e7ba76);
+}
+
+.emulator-records .record-actions {
+  flex: none;
+}
+
+button[data-emulator-action="start"], button[data-emulator-action="select"] {
+  color: var(--panel-green);
+}
+
+button[data-emulator-action="stop"]:hover:enabled {
+  color: var(--panel-danger);
+}
+
+#emulator-status, #emulator-create-error, #emulator-catalog-warning {
+  margin-top: 7px;
+  font-size: 11.5px;
+}
+
+#emulator-create-error,
+#emulator-delete-error {
+  color: var(--panel-danger);
+}
+
+#emulator-create,
+#emulator-delete {
+  box-sizing: border-box;
+  width: min(390px, calc(100% - 22px));
+  max-height: calc(100% - 22px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  color: var(--panel-text);
+  background: var(--panel-surface);
+  box-shadow: 0 14px 42px #080a0fb3;
+}
+
+#emulator-create[open],
+#emulator-delete[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+#emulator-create::backdrop,
+#emulator-delete::backdrop {
+  background: #0006;
+}
+
+.emulator-fields {
+  min-height: 0;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.emulator-fields h3 {
+  margin: 0 0 10px;
+  color: var(--panel-text);
+  font-size: 13px;
+}
+
+.emulator-fields label:not(.emulator-checkbox) {
+  display: block;
+  margin: 9px 0 4px;
+}
+
+.emulator-fields select {
+  appearance: auto;
+  padding-inline: 8px;
+}
+
+#emulator-name {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 33px;
+  padding: 3px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--panel-text);
+  background: var(--panel-input);
+  font: inherit;
+}
+
+#emulator-summary {
+  margin-block: 10px;
+  font-size: 11.5px;
+}
+
+.emulator-checkbox {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 6px;
+  color: var(--panel-text);
+}
+
+.emulator-checkbox input {
+  margin: 0;
+  accent-color: var(--panel-green);
+}
+
+#emulator-progress {
+  margin-top: 12px;
+}
+
+#emulator-progress-status {
+  margin-bottom: 5px;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+#emulator-progress-bar {
+  display: block;
+  width: 100%;
+  height: 8px;
+  accent-color: var(--panel-green);
+}
+
+#emulator-delete-target {
+  margin-bottom: 12px;
+}
+
+#emulator-delete-image-path, #emulator-delete-hint, #emulator-delete-error {
+  margin-top: 6px;
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+#emulator-delete-image-path:not([hidden]) {
+  display: block;
+  color: var(--panel-muted);
+}
+
+#emulator-delete-confirm {
+  color: var(--panel-danger);
+  border-color: var(--panel-danger);
+}
+
+#emulator-delete-confirm:hover:enabled {
+  background: var(--panel-danger-surface);
+}
+
+.emulator-footer {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 9px 12px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.emulator-footer [hidden] {
+  display: none;
+}
+
+#emulator-back {
+  margin-inline-end: auto;
+}

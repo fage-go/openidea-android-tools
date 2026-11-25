@@ -76,11 +76,7 @@ if [ "$action" = "build" ]; then
     exit
 fi
 
-android_cli=$(command -v android || :)
-if [ -z "$android_cli" ]; then
-    android_cli=$HOME/.local/bin/android
-fi
-[ -x "$android_cli" ] || fail '找不到 Android CLI，请检查 PATH 或 ~/.local/bin/android。'
+android_cli=$(android_cli_path) || fail '找不到 Android CLI，请检查 PATH 或 ~/.local/bin/android。'
 
 if [ "$legacy" != "true" ]; then
     exec "$android_cli" "$action" "$module@$variant" "--device=$serial"

@@ -1,30 +1,39 @@
 id = "fage.android-tools"
 name = "Android Tools"
-version = "1.0.0"
-description = "Run Android apps on a selected device."
+version = "1.1.0"
+description = "Run Android apps, manage virtual devices, inspect layouts, and execute ADB commands."
 authors = ["Fage"]
 homepage = "https://github.com/fage-go/openidea-android-tools"
 license = "Apache-2.0"
 categories = ["tools"]
-icon = "icons/android.svg"
+icon = "web/android.svg"
 engines.openidea = "^1.13"
 wasm = "dist/plugin.wasm"
-activation = ["on-command:select-device", "on-view:android"]
+activation = ["on-command:select-device", "on-view:android", "on-view:layout-inspector"]
 
 [capabilities]
-required = ["project.read", "project.write", "process:adb", "process:sh"]
+required = ["project.read", "project.write", "process:adb", "process:sh", "clipboard"]
+optional = ["ipc:$TMPDIR/openidea-android-layout-*"]
 
 [[contributes.commands]]
 id = "select-device"
 title = "选择 Android 设备"
 category = "Android"
-icon = "icons/android.svg"
+icon = "web/android.svg"
 
 [[contributes.views]]
 id = "android"
-title = "Android"
-icon = "icons/android.svg"
+title = "Android Tools"
+icon = "web/android.svg"
 location = "right"
+header = "none"
+web = "web/panel.html"
+
+[[contributes.customEditors]]
+id = "layout-inspector"
+title = "Android 布局检查"
+patterns = ["*.oialayout"]
+priority = "default"
 
 [[contributes.runConfigurations]]
 files = ["settings.gradle", "settings.gradle.kts", "build.gradle", "build.gradle.kts"]
