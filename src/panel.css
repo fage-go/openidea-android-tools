@@ -1,0 +1,79 @@
+body {
+  margin: 0;
+  padding: 12px;
+}
+
+form {
+  display: grid;
+  gap: 7px;
+}
+
+label {
+  color: var(--openidea-fg);
+}
+
+.module-variant-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 5px;
+}
+
+.module-variant-row > div {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+select, button {
+  box-sizing: border-box;
+  min-height: 28px;
+  min-width: 0;
+  color: var(--openidea-fg);
+  border: 1px solid var(--openidea-border);
+  border-radius: 5px;
+  background: var(--openidea-bg-input);
+  font: inherit;
+}
+
+select {
+  padding: 3px 7px;
+}
+
+button {
+  padding: 3px 9px;
+  cursor: pointer;
+}
+
+button:hover:enabled {
+  background: var(--openidea-bg-hover);
+}
+
+:focus-visible {
+  outline: 2px solid var(--openidea-focus-ring);
+  outline-offset: 1px;
+}
+
+button:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
+.refresh-config {
+  justify-self: end;
+  margin-top: 5px;
+  background: var(--openidea-accent);
+  color: var(--openidea-fg-on-accent);
+  border-color: var(--openidea-accent);
+}
+
+.refresh-config:hover:enabled {
+  background: var(--openidea-accent);
+  filter: brightness(1.12);
+}
+
+p {
+  margin: 9px 0 0;
+  color: var(--openidea-fg-muted);
+  white-space: pre-wrap;
+}

@@ -1,0 +1,51 @@
+name: Build plugin
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Rust and the OpenIDEA plugin CLI
+        run: |
+          rustup default stable
+          rustup target add wasm32-wasip2
+          tool_dir="$RUNNER_TEMP/openidea-tools"
+          mkdir -p "$tool_dir"
+          cd "$tool_dir"
+          curl --fail --silent --show-error --location --retry 3 -o openidea-plugin.gz \
+            https://github.com/l0ng-ai/openidea/releases/download/v0.1.51/openidea-plugin-linux-x86_64.gz
+          echo '3f8854530c071c72cf1db77475c6907a6f3ceb5b1746832951854ab871f9c76a  openidea-plugin.gz' | sha256sum --check
+          gunzip openidea-plugin.gz
+          chmod +x openidea-plugin
+          echo "$tool_dir" >> "$GITHUB_PATH"
+
+      - name: Test and build
+        run: |
+          cargo test --locked
+          openidea-plugin build
+
+      - name: Package and validate
+        run: |
+          version=$(sed -n 's/^version = "\([^"]*\)"$/\1/p' plugin.toml)
+          test -n "$version"
+          package="dist/fage.android-tools-$version.oiplugin"
+          openidea-plugin pack --out "$package"
+          openidea-plugin check "$package"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: android-tools-plugin
+          path: dist/*.oiplugin
+          if-no-files-found: error

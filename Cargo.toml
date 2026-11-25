@@ -1,0 +1,21 @@
+[package]
+name = "openidea-android-tools"
+version = "1.0.0"
+edition = "2024"
+license = "Apache-2.0"
+repository = "https://github.com/fage-go/openidea-android-tools"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+openidea-plugin = { git = "https://github.com/l0ng-ai/openidea", tag = "v0.1.49" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+panic = "abort"

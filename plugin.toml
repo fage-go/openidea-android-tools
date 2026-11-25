@@ -1,0 +1,30 @@
+id = "fage.android-tools"
+name = "Android Tools"
+version = "1.0.0"
+description = "Run Android apps on a selected device."
+authors = ["Fage"]
+homepage = "https://github.com/fage-go/openidea-android-tools"
+license = "Apache-2.0"
+categories = ["tools"]
+icon = "icons/android.svg"
+engines.openidea = "^1.13"
+wasm = "dist/plugin.wasm"
+activation = ["on-command:select-device", "on-view:android"]
+
+[capabilities]
+required = ["project.read", "project.write", "process:adb", "process:sh"]
+
+[[contributes.commands]]
+id = "select-device"
+title = "选择 Android 设备"
+category = "Android"
+icon = "icons/android.svg"
+
+[[contributes.views]]
+id = "android"
+title = "Android"
+icon = "icons/android.svg"
+location = "right"
+
+[[contributes.runConfigurations]]
+files = ["settings.gradle", "settings.gradle.kts", "build.gradle", "build.gradle.kts"]

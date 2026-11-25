@@ -1,0 +1,23 @@
+def apkOutputs = null
+
+gradle.afterProject { project ->
+    def selectedModule = project.findProperty('openideaAndroidModule')
+    if (gradle.parent == null && project.path == selectedModule && project.plugins.hasPlugin('com.android.application')) {
+        project.android.applicationVariants.all { variant ->
+            if (variant.name == project.findProperty('openideaAndroidVariant')) {
+                apkOutputs = { variant.outputs.collect { it.outputFile } }
+            }
+        }
+    }
+}
+
+// Read the outputs of the requested assemble task, including when it was up to date.
+gradle.buildFinished { result ->
+    if (result.failure == null && gradle.parent == null) {
+        def files = (apkOutputs?.call() ?: []).findAll { it?.isFile() }.unique()
+        if (files.size() != 1) {
+            throw new GradleException('Expected exactly one deployable APK for this legacy variant.')
+        }
+        new File(gradle.rootProject.property('openideaAndroidApkPath')).text = files[0].absolutePath + '\n'
+    }
+}

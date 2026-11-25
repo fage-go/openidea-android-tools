@@ -1,0 +1,30 @@
+def applications = new TreeMap()
+
+gradle.beforeProject { project ->
+    if (project.gradle.parent == null) {
+        project.pluginManager.withPlugin('com.android.application') {
+            def variants = new TreeSet()
+            applications[project.path] = variants
+            def components = project.extensions.findByName('androidComponents')
+            if (components != null && components.metaClass.respondsTo(components, 'selector')) {
+                components.onVariants(components.selector().all(), { variant ->
+                    variants.add(variant.name)
+                } as org.gradle.api.Action)
+            } else {
+                project.extensions.getByName('android').applicationVariants.all { variant ->
+                    variants.add(variant.name)
+                }
+            }
+        }
+    }
+}
+
+gradle.projectsEvaluated { build ->
+    if (build.parent == null) {
+        new File(System.getProperty('openideaAndroidModules')).withWriter('UTF-8') { writer ->
+            applications.each { module, variants ->
+                writer.writeLine(module + '\t' + variants.join('\t'))
+            }
+        }
+    }
+}

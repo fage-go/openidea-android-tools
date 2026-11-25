@@ -1,0 +1,6 @@
+/target/
+/dist/
+/*.oiplugin
+/.DS_Store
+/DEVELOPMENT_PLAN.md
+/openidea-v0.1.51-gradle.patch
